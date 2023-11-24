@@ -85,7 +85,7 @@ string (x:xs) = do char x
                    return (x:xs)
 
 ident :: Parser String
-ident = do x  <- lower
+ident = do x  <- letter
            xs <- many alphanum
            return (x:xs)
 

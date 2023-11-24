@@ -1,19 +1,14 @@
-module APL_Parser where
+module WPC_Parser where
 
 import Parsing
 
 {-
 WPC GRAMMAR
-<flux>        ::= SKIP 
-                | <comp> 
-                | <choice>
+<flux>        ::= SKIP RPAREN
+                | LPAREN <comp> 
+                | LPAREN <choice>
 <comp>        ::= <command> COMP <flux>
-<choice>      ::= SKIP CHOICE <flux> 
-                | <comp> CHOICE <flux>
-                | SKIP CHOICE <flux> <choices> 
-                | <comp> CHOICE <flux> <choices>
-<choices>     ::= CHOICE <flux> <choices> 
-                | CHOICE <flux>
+<choice>      ::= <flux> CHOICE <flux> 
 <command>     ::= <assume> 
                 | <force> 
                 | <attrib> 
@@ -52,13 +47,45 @@ WPC GRAMMAR
 <factor>      ::=  LPAREN <expr> RPAREN | INT | ID
 -}
 
+-- Parser (BTree (Either String Char))
 
-
-flux = do skip 
-        <|> comp
-        <|> choice
+flux :: Parser (BTree (Either String Char))
+flux = do string "skip" 
+          char ')'
+          return (Node (Right '$') Empty Empty)
+   <|> comp
+   <|> do char '('
+          x <- choice
+          return x
+   <|> do char '('
+          x <- flux
+          return (x)
 comp = do x <- command
           char ';'
           y <- flux
-          return (x ++ ";" ++ y)
-
+          return (Node (Right ';') x y)
+choice = do x <- flux
+            char '|'
+            char '|'
+            y <- flux
+            return (Node (Right '|') x y)
+command = assume
+      <|> force
+      <|> havoc
+      <|> attrib
+assume = do string "assume "
+            x <- log_expr
+            return (Node (Right 'A') x Empty)
+force  = do string "force " <|> string "assert "
+            x <- log_expr
+            return (Node (Right 'F') x Empty)
+havoc  = do string "havoc "
+            x <- vector
+            return (Node (Right 'H') x Empty)
+attrib = do x <- vector
+            char '<'
+            char '-'
+            y <- expr_vector
+            return (Node (Right 'a') x y)
+log_expr = do x <- ident ; return (Node (Left x) Empty Empty)
+       <|> do askld
