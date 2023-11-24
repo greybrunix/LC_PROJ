@@ -78,7 +78,7 @@ attrib = do x <- vector
 -}
 vector = do char '('
             x <- vector_ids
-            return (Node "," x Empty)
+            return x
         <|> do x <- ident
                return (Node x Empty Empty)
 vector_ids = do x <- ident
