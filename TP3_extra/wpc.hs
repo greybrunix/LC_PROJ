@@ -1,36 +1,6 @@
 module WPC_Parser where
 
 import Parsing
-{-
-<vector>      ::= LPAREN <vector_ids>
-                | ID
-<vector_ids>  ::= ID <vec_ids_m>
-                | RPAREN
-<vec_ids_m>   ::= COMMA <vector_ids>
-                | <vector_ids>
-<log_expr>    ::= <log_term> op_ex <log_expr>
-                | <log_term>
-<log_term>    ::= <log_factor> op_term <log_term>
-                | <log_factor>
-<log_factor>  ::= LPAREN <log_factor> RPAREN
-                | ID
-                | INT
-                | True
-                | False
-                | NOT <expr>
-                | Forall <vector> DOT <expr>
-                | Exists <vector> DOT <expr>
-<op_ex>       ::= LT | LE | GT | GE | EQ | NE
-<expr_vector> ::= LPAREN <exprs>
-                | <expr>
-<exprs>       ::= <expr> <exprs_m>
-                | RPAREN
-<exprs_m>     ::= COMMA  <exprs>
-                | <exprs>
-<expr>        ::=  <term> ADD <expr> | <term> SUB <expr> | <term>
-<term>        ::=  <factor> MUL <term> | <factor> DIV <term> | <factor>
-<factor>      ::=  LPAREN <expr> RPAREN | INT | ID
--}
 
 -- Parser (BTree String))
 
@@ -58,7 +28,7 @@ choice = do x <- flux
 command = assume
       <|> force
       <|> havoc
---      <|> attrib
+      <|> attrib
 assume = do string "assume "
             x <- log_expr
             return (Node "A" x Empty)
@@ -68,19 +38,20 @@ force  = do string "force " <|> string "assert "
 havoc  = do string "havoc "
             x <- vector
             return (Node "H" x Empty)
-
-{-
+     <|> do string "havoc "
+            x <- ident
+            return (Node "H" (Node x Empty Empty) Empty)
 attrib = do x <- vector
-            char '<'
-            char '-'
+            string " <- "
             y <- expr_vector
-            return (Node ":=" x y)
--}
+            return (Node "<-" x y)
+     <|> do x <- ident 
+            string " <- "
+            y <- expr
+            return (Node "<-" (Node x Empty Empty) y)
 vector = do char '('
             x <- vector_ids
             return x
-        <|> do x <- ident
-               return (Node x Empty Empty)
 vector_ids = do x <- ident
                 y <- vector_ids_m
                 return (Node "," (Node x Empty Empty) y)
@@ -89,7 +60,78 @@ vector_ids = do x <- ident
 vector_ids_m = do char ','
                   x <- vector_ids
                   return x
-
-
+expr_vector = do char '('
+                 x <- exprs
+                 return x
+exprs = do x <- expr
+           y <- exprs_m
+           return (Node "," x y)
+    <|> do x <- expr
+           char ')'
+           return x
+exprs_m = do char ','
+             x <- exprs
+             return x
+expr = do x <- term
+          char '+'
+          y <- expr
+          return (Node "+" x y)
+      <|> do x <- term
+             char '-'
+             y <- expr
+             return (Node "-" x y)
+      <|> term
+term = do x <- factor
+          char '*'
+          y <- term
+          return (Node "*" x y)
+      <|> do x <- factor
+             string " div "
+             y <- term
+             return (Node "/" x y)
+      <|> factor
+factor = do char '('
+            x <- expr
+            char ')'
+            return x
+        <|> do x <- int
+               return (Node (show x) Empty Empty)
+        <|> do x <- ident
+               return (Node x Empty Empty)
+        <|> do char '-'
+               x <- expr
+               return (Node "-" x Empty)
 log_expr = do x <- ident ; return (Node x Empty Empty)
---       <|> do askld
+         <|> do char '('; x <- log_term
+                y <- log_op
+                z <- log_expr
+                char ')'; return (Node y x z)
+        <|> log_term
+log_term = do x <- log_factor
+              y <- log_con
+              z <- log_term
+              return (Node y x z)
+        <|> log_factor
+log_factor = do char '('
+                x <- log_expr
+                char ')'
+                return x
+        <|> do x <- log_things; return (Node x Empty Empty)
+        <|> do x <- int; return (Node (show x) Empty Empty)
+        <|> do string "ForAll"
+               x <- vector
+               string " . "
+               y <- log_expr
+               return (Node "FORALL" x y)
+        <|> do string "Exists"
+               x <- vector
+               string " . "
+               y <- log_expr
+               return (Node "Exists" x y)
+        <|> do char '~'
+               x <- log_expr
+               return (Node "NOT" x Empty)
+log_op = string "<=" <|> string ">=" <|>  string "<" <|> string ">"
+     <|> string "=" <|> string "!="
+log_con = string "AND" <|> string "OR" <|> string "IMPLIES"
+log_things = ident <|> string "TRUE" <|> string "FALSE"  
