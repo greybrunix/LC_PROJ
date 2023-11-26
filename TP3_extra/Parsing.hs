@@ -10,7 +10,6 @@ import Data.Char
 
 newtype Parser a = P (String -> [(a,String)])
 
-data BTree a = Empty | Node a (BTree a) (BTree a) deriving (Show)
 
 parse :: Parser a -> String -> [(a,String)]
 parse (P p) inp = p inp
@@ -42,6 +41,7 @@ instance Monad Parser where
    p >>= f = P (\inp -> case parse p inp of
                            []        -> []
                            [(v,out)] -> parse (f v) out)
+   
 
 -- Making choices
 
@@ -55,6 +55,7 @@ instance Alternative Parser where
                            [(v,out)] -> [(v,out)])
 
 -- Derived primitives
+
 
 sat :: (Char -> Bool) -> Parser Char
 sat p = do x <- item
