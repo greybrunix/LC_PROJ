@@ -123,7 +123,16 @@ int_t =
 consume :: [(BTree (String), String)] -> Maybe String
 consume []     = Nothing
 consume ((x,y:ys):xs) = Nothing
-consume ((x,""):xs) = Just (tree2eval x)
+-- entire input was consumed
+consume ((x,""):xs) = if (check_commas(x)) then Just (tree2eval x) else Nothing
+
+check_commas :: BTree (String) -> Bool
+check_commas Empty = True
+check_commas (Node a t1 t2) = if ((==) a ":=") then (==) (count_commas t1) (count_commas t2) else and [(check_commas t1),(check_commas t2)]
+
+count_commas :: BTree (String) -> Int
+count_commas Empty = 0
+count_commas (Node a t1 t2) = if ((==) a "vector") then succ (count_commas t2) else (+) (count_commas t1) (count_commas t2)
 
 tree2eval :: BTree String -> String
 tree2eval Empty = ""
