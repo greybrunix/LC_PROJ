@@ -29,6 +29,10 @@ command = assume
       <|> force
       <|> havoc
       <|> attrib
+      <|> do char '{'
+             x <- flux
+             char '}'
+             return x
 assume = do string "assume"
             space
             x <- log_expr
