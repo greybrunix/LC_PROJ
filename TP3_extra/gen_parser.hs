@@ -31,7 +31,7 @@ command =
   (>>=) (char '{') (\_ ->
   (>>=) flux (\x ->
   (>>=) (char '}') (\_ ->
-  return (Node "Prio" x Empty))))
+  return x)))
       <|>
   (>>=) (string "Assume ") (\_ ->
   (>>=) ident_t (\x ->
@@ -120,65 +120,71 @@ int_t =
   (>>=) int (\i ->
   return (Node (show i) Empty Empty))
 -- end recognizing
-
--- translation parser
-check_commas :: BTree (String) -> Bool
-check_commas Empty = True
-check_commas (Node a t1 t2) = if ((==) a ":=") then (==) (count_commas t1) (count_commas t2) else (&&) (check_commas t1) (check_commas t2)
-
-count_commas :: BTree (String) -> Int
-count_commas Empty = 0
-count_commas (Node a t1 t2) = if ((==) a "vector") then succ (count_commas t2) else (+) (count_commas t1) (count_commas t2)
-
 ntree :: BTree (String) -> NTree (String)
-ntree Empty = EmptyN
+ntree Empty = error "empty input?"
 ntree (Node a Empty Empty) = NodeN a []
 ntree (Node a Empty t2) = NodeN a [ntree t2]
 ntree (Node a t1 Empty) = NodeN a [ntree t1]
 ntree (Node a t1 t2) = NodeN a ((ntree t1) : [(ntree t2)])
 
-cmps :: NTree (String) -> NTree (String)
-cmps EmptyN = EmptyN
-cmps (NodeN a []) = (NodeN a [])
-cmps (NodeN a (t1:[])) = if (/=) a "Prio"
-                              then if (/=) a ";"
-                                   then (NodeN a [cmps t1])
-                                   else (NodeN a (cmp t1))
-                            else (NodeN a [cmps t1])
-cmps (NodeN a (t1:[t2]))= if (/=) a ";"
-                                   then (NodeN a ((cmps t1):([cmps t2])))
-                                   else (NodeN a ((cmps t1):(cmp t2)))
-chcs :: NTree (String) -> NTree (String)
-chcs EmptyN = EmptyN
-chcs (NodeN a []) = (NodeN a [])
-chcs (NodeN a (t1:[])) = if (/=) a "Prio"
-                            then if (/=) a "||"
-                                  then (NodeN a [chcs t1])
-                                 else (NodeN a (chc t1))
-                           else (NodeN a [chcs t1])
-chcs (NodeN a (t1:[t2]))= if (/=) a "||"
-                                   then (NodeN a ((chcs t1):([chcs t2])))
-                                   else (NodeN a ((chcs t1):(chc t2)))
+cmps_chcs :: NTree (String) -> NTree (String)
+cmps_chcs EmptyN = error "Empty?"
+cmps_chcs (NodeN a []) = (NodeN a [])
+cmps_chcs (NodeN a (t1:[])) = NodeN a [t1]
+cmps_chcs (NodeN a (t1:[t2]))= if (/=) a ";"
+                                then if (/=) a "||"
+                                      then (NodeN a (t1:[t2]))
+                                     else chc (NodeN a (t1:[t2]))
+                               else cmp (NodeN a (t1:[t2]))
 
-cmp :: NTree (String) -> [NTree (String)]
-cmp EmptyN = []
-cmp (NodeN a []) = [NodeN a []]
-cmp (NodeN a [t1]) = [NodeN a [t1]]
-cmp (NodeN a (t1:[t2])) =
-    if (/=) a ";"
-     then ([cmps t1 , (cmps t2)])
-    else ((cmps t1):(cmp t2))
+cmp :: NTree (String) -> NTree String
+cmp EmptyN = error "Empty?"
+cmp (NodeN a []) = NodeN a []
+cmp (NodeN a [t1]) = NodeN a [t1]
+cmp (NodeN a (((NodeN b l1)):[NodeN c l2])) =
+    if (/=) b ";"
+     then if (/=) c ";"
+           then (NodeN a 
+                       (
+                          (cmps_chcs (NodeN b l1))
+                         :[(cmps_chcs (NodeN c l2))]
+                       ))
+          else (NodeN a (
+                          (NodeN b l1)
+                         :(cm (NodeN c l2))
+                        ))
+    else (NodeN a (
+                    (cm (NodeN b l1)) 
+                      ++
+                    [cmps_chcs (NodeN c l2)]
+                  ))
 
-chc :: NTree (String) -> [NTree (String)]
-chc EmptyN = []
-chc (NodeN a []) = [NodeN a []]
-chc (NodeN a [t1]) = [NodeN a [t1]]
-chc (NodeN a (t1:[t2])) =
-    if (/=) a "||"
-     then ([chcs t1 , (chcs t2)])
-    else ((chcs t1):(chc t2))
+chc :: NTree (String) -> NTree (String)
+chc EmptyN = error "Empty?"
+chc (NodeN a []) = NodeN a []
+chc (NodeN a [t1]) = NodeN a [t1]
+chc (NodeN a (((NodeN b l1)):[NodeN c l2])) =
+    if (/=) b "||"
+     then if (/=) c "||"
+           then (NodeN a (
+                            (cmps_chcs (NodeN b l1))
+                           :[(cmps_chcs (NodeN c l2))]
+                         ))
+          else (NodeN a (
+                           (NodeN b l1)
+                          :(ch (NodeN c l2))
+                        ))
+    else (NodeN a (
+                     (ch (NodeN b l1))
+                        ++
+                     [cmps_chcs (NodeN c l2)]
+                   ))
 
-consume = tree2eval . chcs . cmps . ntree . fst . head . parse flux
+cm :: NTree String -> [NTree String]
+cm (NodeN a ((NodeN b l1):l2) = if 
+ch :: NTree String -> [NTree String]
+ch (NodeN _ _) = []
+consume = tree2eval . cmps_chcs . ntree . fst . head . parse flux
 
 tree2eval :: NTree String -> String
 tree2eval EmptyN = ""
