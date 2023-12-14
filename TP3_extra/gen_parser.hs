@@ -141,23 +141,8 @@ cmp :: NTree (String) -> NTree String
 cmp EmptyN = error "Empty?"
 cmp (NodeN a []) = NodeN a []
 cmp (NodeN a [t1]) = NodeN a [t1]
-cmp (NodeN a (((NodeN b l1)):[NodeN c l2])) =
-    if (/=) b ";"
-     then if (/=) c ";"
-           then (NodeN a 
-                       (
-                          (cmps_chcs (NodeN b l1))
-                         :[(cmps_chcs (NodeN c l2))]
-                       ))
-          else (NodeN a (
-                          (NodeN b l1)
-                         :(cm (NodeN c l2))
-                        ))
-    else (NodeN a (
-                    (cm (NodeN b l1)) 
-                      ++
-                    [cmps_chcs (NodeN c l2)]
-                  ))
+cmp (NodeN a (((NodeN b l1)):[NodeN c l2])) |
+    (&&) ((/=) b ";") 
 
 chc :: NTree (String) -> NTree (String)
 chc EmptyN = error "Empty?"
@@ -181,9 +166,16 @@ chc (NodeN a (((NodeN b l1)):[NodeN c l2])) =
                    ))
 
 cm :: NTree String -> [NTree String]
-cm (NodeN a ((NodeN b l1):l2) = if 
+cm EmptyN = error "Empty?"
+cm (NodeN a []) = [NodeN a []]
+cm (NodeN a [t1]) = [NodeN a [t1]]
+cm (NodeN a ((NodeN b (t1:[t2])):l2)) = if (/=) b ";"  then (NodeN b (t1:[t2])):l2   else (cmp t1) ++ (cmp t2) ++ l2
 ch :: NTree String -> [NTree String]
-ch (NodeN _ _) = []
+ch EmptyN = error "Empty?"
+ch (NodeN a []) = [NodeN a []]
+ch (NodeN a [t1]) = [NodeN a [t1]]
+ch (NodeN a ((NodeN b (t1:[t2])):l2)) = if (/=) b "||"  then (NodeN b (t1:[t2])):l2   else (ch t1) ++ (chp t2) ++ l2
+
 consume = tree2eval . cmps_chcs . ntree . fst . head . parse flux
 
 tree2eval :: NTree String -> String
